@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 
+#[derive(Clone)]
 pub enum TaskStatus {
     Pending,
     Running,
@@ -7,6 +8,7 @@ pub enum TaskStatus {
     Failed,
 }
 
+#[derive(Clone)]
 pub(crate) struct Task<'a> {
     pub id: String,
     pub data: &'a Vec<u8>,
