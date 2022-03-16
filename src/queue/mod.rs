@@ -34,11 +34,11 @@ impl Queue {
         chan_name: &str,
         data: Vec<u8>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let task = task::Task::new(data.to_owned());
+        let task = task::Task::new(data);
         // add task to queue
         let x = match self.tasks.get_mut() {
             Ok(tasks) => {
-                let task_id = task.id.clone().to_owned();
+                let task_id = task.id.clone();
                 tasks.push(task.clone());
                 task_id
             }
@@ -76,7 +76,7 @@ mod tests {
     fn add_task() {
         let mut q: Queue = Queue::new();
         let qq = &mut q;
-        let data = "test123abc".as_bytes().to_vec().to_owned(); // should live longer than q
+        let data = "test123abc".as_bytes().to_vec(); // should live longer than q
         assert_eq!(qq.add_task("test_chan", data).is_err(), false);
     }
 }
