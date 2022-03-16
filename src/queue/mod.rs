@@ -1,22 +1,26 @@
 use crossbeam_channel::{Receiver, Sender};
-use std::{collections::HashMap, lazy::SyncLazy, sync};
+use std::{
+    collections::HashMap,
+    lazy::SyncLazy,
+    sync::{self, Mutex},
+};
 
 use self::task::Task;
 
 mod task;
 
-struct QueueChan<'a> {
+struct QueueChan {
     id: String,
-    chan: (Sender<Task<'a>>, Receiver<Task<'a>>),
+    chan: (Sender<Task>, Receiver<Task>),
     status: task::TaskStatus,
 }
 
-pub struct Queue<'a> {
-    tasks: sync::RwLock<Vec<task::Task<'a>>>,
-    ch: HashMap<String, QueueChan<'a>>,
+pub struct Queue {
+    tasks: sync::RwLock<Vec<task::Task>>,
+    ch: HashMap<String, QueueChan>,
 }
 
-impl<'a> Queue<'a> {
+impl Queue {
     pub fn new() -> Self {
         Queue {
             tasks: sync::RwLock::new(Vec::new()),
@@ -28,12 +32,12 @@ impl<'a> Queue<'a> {
     pub fn add_task(
         &mut self,
         chan_name: &str,
-        data: &'a Vec<u8>,
+        data: Vec<u8>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let task = task::Task::new(data);
+        let task = task::Task::new(data.to_owned());
         // add task to queue
         let x = match self.tasks.get_mut() {
-            Ok::<&mut Vec<Task<'a>>, _>(tasks) => {
+            Ok(tasks) => {
                 let task_id = task.id.clone().to_owned();
                 tasks.push(task.clone());
                 task_id
@@ -49,7 +53,7 @@ impl<'a> Queue<'a> {
                 chan: crossbeam_channel::unbounded(),
                 status: task::TaskStatus::Pending,
             });
-        match chan.chan.0.send(task.clone()) {
+        match chan.chan.0.send(task) {
             Ok(_) => {}
             Err(err) => return Err(format!("Failed to send task to channel|Err: {}", err).into()),
         };
@@ -60,4 +64,19 @@ impl<'a> Queue<'a> {
 }
 
 // singleton Queue
-pub static Q: SyncLazy<Queue> = SyncLazy::new(|| Queue::new());
+pub static Q: SyncLazy<Mutex<Queue>> = SyncLazy::new(|| Mutex::new(Queue::new()));
+
+// test
+#[cfg(test)]
+mod tests {
+
+    use super::Queue;
+
+    #[test]
+    fn add_task() {
+        let mut q: Queue = Queue::new();
+        let qq = &mut q;
+        let data = "test123abc".as_bytes().to_vec().to_owned(); // should live longer than q
+        assert_eq!(qq.add_task("test_chan", data).is_err(), false);
+    }
+}

@@ -9,15 +9,15 @@ pub enum TaskStatus {
 }
 
 #[derive(Clone)]
-pub(crate) struct Task<'a> {
+pub(crate) struct Task {
     pub id: String,
-    pub data: &'a Vec<u8>,
+    pub data: Vec<u8>,
     pub creation_date: DateTime<Utc>,
     pub status: TaskStatus,
 }
 
-impl<'a> Task<'a> {
-    pub fn new(data: &'a Vec<u8>) -> Self {
+impl Task {
+    pub fn new(data: Vec<u8>) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             data: data,
