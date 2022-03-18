@@ -9,7 +9,7 @@ pub enum TaskStatus {
 }
 
 #[derive(Clone)]
-pub(crate) struct Task {
+pub struct Task {
     pub id: String,
     pub data: Vec<u8>,
     pub creation_date: DateTime<Utc>,

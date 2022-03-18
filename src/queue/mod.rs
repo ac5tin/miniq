@@ -61,6 +61,16 @@ impl Queue {
         // success
         Ok(x)
     }
+
+    pub fn get_chan(
+        &self,
+        chan_name: &str,
+    ) -> Result<&Receiver<Task>, Box<dyn std::error::Error + Send + Sync>> {
+        match self.ch.get(chan_name) {
+            Some(ch) => Ok(&ch.chan.1),
+            None => Err("".into()),
+        }
+    }
 }
 
 // singleton Queue
@@ -70,13 +80,40 @@ pub static Q: SyncLazy<Mutex<Queue>> = SyncLazy::new(|| Mutex::new(Queue::new())
 #[cfg(test)]
 mod tests {
 
+    use std::sync::Arc;
+
+    use tokio::sync::Mutex;
+
     use super::Queue;
 
-    #[test]
-    fn add_task() {
-        let mut q: Queue = Queue::new();
-        let qq = &mut q;
-        let data = "test123abc".as_bytes().to_vec(); // should live longer than q
-        assert_eq!(qq.add_task("test_chan", data).is_err(), false);
+    #[tokio::test]
+    async fn add_task() {
+        {
+            // receive task channel
+            let q = Arc::new(Mutex::new(Queue::new()));
+
+            let q1 = Arc::clone(&q);
+
+            // print received Tasks
+            let j = tokio::task::spawn(async move {
+                let qq = q1.lock().await;
+                let rcv = qq.get_chan("test_chan").unwrap();
+                // infinite loop
+                for t in rcv.iter() {
+                    println!("received task with id: {}", t.id);
+                    break; // break loop after receiving 1 task
+                }
+                return;
+            });
+            {
+                // add task
+                let data = "test123abc".as_bytes().to_vec();
+                let q = Arc::clone(&q);
+                let mut qq = q.lock().await;
+                println!("Sending new task");
+                assert_eq!(qq.add_task("test_chan", data).is_err(), false);
+            }
+            j.await.unwrap();
+        }
     }
 }
