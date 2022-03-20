@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+package miniq;
+
+enum TaskStatus {
+  pending = 0;
+  running = 1;
+  completed = 2;
+  failed = 3;
+}
+
+message Task {
+  string id = 1;
+  bytes data = 2;
+  google.protobuf.Timestamp creation_date = 3;
+  TaskStatus status = 4;
+}
+
+message GetTaskRequest { string name = 1; }
+
+message AddTaskRequest {
+  string channel = 1;
+  bytes data = 2;
+}
+
+service MiniQ {
+  rpc GetTasks(GetTaskRequest) returns (stream Task) {}
+  rpc AddTask(AddTaskRequest) returns (google.protobuf.Empty) {}
+}

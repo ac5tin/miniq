@@ -1,13 +1,13 @@
+use self::task::Task;
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     collections::HashMap,
     lazy::SyncLazy,
-    sync::{self, Mutex},
+    sync::{self, Arc},
 };
+use tokio::sync::Mutex;
 
-use self::task::Task;
-
-mod task;
+pub mod task;
 
 struct QueueChan {
     id: String,
