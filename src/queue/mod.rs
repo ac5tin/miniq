@@ -1,23 +1,17 @@
 use self::task::Task;
-use crossbeam_channel::{Receiver, Sender};
+use flume::{Receiver, Sender};
 use std::{
     collections::HashMap,
     lazy::SyncLazy,
-    sync::{self, Arc},
+    sync::{self},
 };
 use tokio::sync::Mutex;
 
 pub mod task;
 
-struct QueueChan {
-    id: String,
-    chan: (Sender<Task>, Receiver<Task>),
-    status: task::TaskStatus,
-}
-
 pub struct Queue {
     tasks: sync::RwLock<Vec<task::Task>>,
-    ch: HashMap<String, QueueChan>,
+    ch: HashMap<String, (Sender<Task>, Receiver<Task>)>, // channel_id -> sender
 }
 
 impl Queue {
@@ -29,7 +23,7 @@ impl Queue {
     }
 
     // Add new task to queue
-    pub fn add_task(
+    pub async fn add_task(
         &mut self,
         chan_name: &str,
         data: Vec<u8>,
@@ -48,12 +42,9 @@ impl Queue {
         let chan = self
             .ch
             .entry(chan_name.to_owned())
-            .or_insert_with(|| QueueChan {
-                id: chan_name.to_owned(),
-                chan: crossbeam_channel::unbounded(),
-                status: task::TaskStatus::Pending,
-            });
-        match chan.chan.0.send(task) {
+            .or_insert_with(|| flume::unbounded());
+
+        match chan.0.send_async(task.to_owned()).await {
             Ok(_) => {}
             Err(err) => return Err(format!("Failed to send task to channel|Err: {}", err).into()),
         };
@@ -63,13 +54,16 @@ impl Queue {
     }
 
     pub fn get_chan(
-        &self,
+        &mut self,
         chan_name: &str,
-    ) -> Result<&Receiver<Task>, Box<dyn std::error::Error + Send + Sync>> {
-        match self.ch.get(chan_name) {
-            Some(ch) => Ok(&ch.chan.1),
-            None => Err("".into()),
-        }
+    ) -> Result<Receiver<Task>, Box<dyn std::error::Error + Send + Sync>> {
+        let chan = self
+            .ch
+            .entry(chan_name.to_owned())
+            .or_insert_with(|| flume::unbounded());
+
+        let rcv = chan.1.clone();
+        Ok(rcv)
     }
 }
 
@@ -80,6 +74,7 @@ pub static Q: SyncLazy<Mutex<Queue>> = SyncLazy::new(|| Mutex::new(Queue::new())
 #[cfg(test)]
 mod tests {
 
+    use core::time;
     use std::sync::Arc;
 
     use tokio::sync::Mutex;
@@ -96,22 +91,30 @@ mod tests {
 
             // print received Tasks
             let j = tokio::task::spawn(async move {
-                let qq = q1.lock().await;
-                let rcv = qq.get_chan("test_chan").unwrap();
-                // infinite loop
-                for t in rcv.iter() {
+                println!("spawned green thread"); //debug
+                                                  //let mut qq = q1.lock().await;
+                let rcv = q1.lock().await.get_chan("test_chan").unwrap();
+                println!("receiving"); //debug
+                                       // infinite loop
+                                       // async iterator
+                while let Ok(t) = rcv.recv_async().await {
                     println!("received task with id: {}", t.id);
                     break; // break loop after receiving 1 task
                 }
+                println!("received, exiting"); //debug
                 return;
             });
+            // pause to wait for green thread to start
+            {
+                tokio::time::sleep(time::Duration::from_secs(1)).await;
+            }
             {
                 // add task
                 let data = "test123abc".as_bytes().to_vec();
                 let q = Arc::clone(&q);
                 let mut qq = q.lock().await;
                 println!("Sending new task");
-                assert_eq!(qq.add_task("test_chan", data).is_err(), false);
+                assert_eq!(qq.add_task("test_chan", data).await.is_err(), false);
             }
             j.await.unwrap();
         }

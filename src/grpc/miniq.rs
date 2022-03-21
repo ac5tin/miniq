@@ -60,7 +60,7 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
     ) -> Result<tonic::Response<()>, tonic::Status> {
         let mut q = Q.lock().await;
         let r = req.into_inner();
-        match q.add_task(&r.channel, r.data.to_owned()) {
+        match q.add_task(&r.channel, r.data.to_owned()).await {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::new(
                 tonic::Code::Internal,
@@ -74,15 +74,11 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
         request: tonic::Request<mini_q::GetTaskRequest>,
     ) -> Result<tonic::Response<Self::GetTasksStream>, tonic::Status> {
         // infinite stream of tasks
-
-        //let stream = Arc::new(Mutex::new(tokio_stream::iter(rcv.iter())));
-
         let (tx, rx) = mpsc::channel(128);
         tokio::task::spawn(async move {
-            let q = Q.lock().await;
-
-            let rcv = match q.get_chan(&request.into_inner().name) {
-                Ok(rcv) => rcv,
+            let req = request.into_inner();
+            let rcv = match Q.lock().await.get_chan(&req.name) {
+                Ok(ch) => ch,
                 Err(_) => {
                     return Err(tonic::Status::new(
                         tonic::Code::Internal,
@@ -90,10 +86,10 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
                     ))
                 }
             };
+            // drop(q);
 
-            for task in rcv.iter() {
+            while let Ok(task) = rcv.recv_async().await {
                 let t: mini_q::Task = task.into();
-
                 match tx.send(Result::<_, tonic::Status>::Ok(t)).await {
                     Ok(_) => {}
                     Err(_) => {
@@ -102,6 +98,7 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
                     }
                 };
             }
+            println!("Channel closed"); // debug
             Ok(())
         });
         let output_stream = ReceiverStream::new(rx);
