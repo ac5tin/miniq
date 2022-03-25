@@ -1,4 +1,4 @@
-use self::task::Task;
+use self::task::{Task, TaskStatus};
 use flume::{Receiver, Sender};
 use std::{
     collections::HashMap,
@@ -65,6 +65,38 @@ impl Queue {
         let rcv = chan.1.clone();
         Ok(rcv)
     }
+
+    pub async fn update_task_status(
+        &mut self,
+        chan_name: &str,
+        task_id: &str,
+        status: TaskStatus,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // update task array
+        let mut tasks = match self.tasks.write() {
+            Ok(tasks) => tasks,
+            Err(_) => return Err("Failed to update task status".into()),
+        };
+        let task = tasks.iter_mut().find(|t| t.id == task_id);
+        let t = match task {
+            Some(t) => {
+                t.status = status;
+                t
+            }
+            None => return Err("Failed to update task status".into()),
+        };
+        // stream task
+        let chan = self
+            .ch
+            .entry(chan_name.to_owned())
+            .or_insert_with(|| flume::unbounded());
+
+        match chan.0.send_async(t.to_owned()).await {
+            Ok(_) => {}
+            Err(err) => return Err(format!("Failed to send task to channel|Err: {}", err).into()),
+        };
+        Ok(())
+    }
 }
 
 // singleton Queue
@@ -79,7 +111,7 @@ mod tests {
 
     use tokio::sync::Mutex;
 
-    use super::Queue;
+    use super::{task::TaskStatus, Queue};
 
     #[tokio::test]
     async fn add_task() {
@@ -115,6 +147,55 @@ mod tests {
                 let mut qq = q.lock().await;
                 println!("Sending new task");
                 assert_eq!(qq.add_task("test_chan", data).await.is_err(), false);
+            }
+            j.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn update_task() {
+        {
+            // receive task channel
+            let q = Arc::new(Mutex::new(Queue::new()));
+
+            let q1 = Arc::clone(&q);
+
+            // print received Tasks
+            let j = tokio::task::spawn(async move {
+                println!("spawned green thread"); //debug
+                                                  //let mut qq = q1.lock().await;
+                let rcv = q1.lock().await.get_chan("test_chan").unwrap();
+                println!("receiving"); //debug
+                                       // infinite loop
+                                       // async iterator
+                while let Ok(t) = rcv.recv_async().await {
+                    if t.status == TaskStatus::Completed {
+                        println!("received Completed task with id: {}", t.id);
+                        break; // break loop after receiving 1 task
+                    }
+                }
+                println!("received, exiting"); //debug
+                return;
+            });
+            // pause to wait for green thread to start
+            {
+                tokio::time::sleep(time::Duration::from_secs(1)).await;
+            }
+            {
+                // add task
+                let data = "test123abc".as_bytes().to_vec();
+                let q = Arc::clone(&q);
+                let mut qq = q.lock().await;
+                println!("Sending new task");
+                let task_add_res = qq.add_task("test_chan", data).await;
+                assert_eq!(task_add_res.is_err(), false);
+                let task_id = task_add_res.unwrap();
+                assert_eq!(
+                    qq.update_task_status("test_chan", &task_id, TaskStatus::Completed)
+                        .await
+                        .is_err(),
+                    false
+                );
             }
             j.await.unwrap();
         }
