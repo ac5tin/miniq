@@ -73,7 +73,7 @@ impl Queue {
         status: TaskStatus,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // update task array
-        let mut tasks = match self.tasks.write() {
+        let tasks = match self.tasks.get_mut() {
             Ok(tasks) => tasks,
             Err(_) => return Err("Failed to update task status".into()),
         };
