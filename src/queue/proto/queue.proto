@@ -25,7 +25,14 @@ message AddTaskRequest {
   bytes data = 2;
 }
 
+message UpdateTaskRequest {
+  string id = 1;
+  string channel = 2;
+  TaskStatus status = 3;
+}
+
 service MiniQ {
   rpc GetTasks(GetTaskRequest) returns (stream Task) {}
   rpc AddTask(AddTaskRequest) returns (google.protobuf.Empty) {}
+  rpc UpdateTask(UpdateTaskRequest) returns (google.protobuf.Empty) {}
 }

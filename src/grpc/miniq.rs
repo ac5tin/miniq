@@ -106,4 +106,22 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
             Box::pin(output_stream) as Self::GetTasksStream
         ))
     }
+
+    async fn update_task(
+        &self,
+        request: tonic::Request<mini_q::UpdateTaskRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let mut q = Q.lock().await;
+        let r = request.into_inner();
+        match q
+            .update_task_status(&r.channel, &r.id, r.status.into())
+            .await
+        {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::new(
+                tonic::Code::Internal,
+                format!("Failed to update task|Err: {}", err),
+            )),
+        }
+    }
 }
