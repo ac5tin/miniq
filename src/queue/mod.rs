@@ -1,5 +1,5 @@
 use self::task::{Task, TaskStatus};
-use flume::{Receiver, Sender};
+use async_broadcast::{broadcast, Receiver, Sender};
 use std::{
     collections::HashMap,
     lazy::SyncLazy,
@@ -12,6 +12,13 @@ pub mod task;
 pub struct Queue {
     tasks: sync::RwLock<Vec<task::Task>>,
     ch: HashMap<String, (Sender<Task>, Receiver<Task>)>, // channel_id -> sender
+}
+
+fn new_ch() -> (Sender<Task>, Receiver<Task>) {
+    let mut ch = broadcast(1);
+    ch.0.set_overflow(true);
+    ch.1.set_overflow(true);
+    ch
 }
 
 impl Queue {
@@ -42,9 +49,9 @@ impl Queue {
         let chan = self
             .ch
             .entry(chan_name.to_owned())
-            .or_insert_with(|| flume::unbounded());
+            .or_insert_with(|| broadcast(100));
 
-        match chan.0.send_async(task.to_owned()).await {
+        match chan.0.broadcast(task.to_owned()).await {
             Ok(_) => {}
             Err(err) => return Err(format!("Failed to send task to channel|Err: {}", err).into()),
         };
@@ -60,10 +67,9 @@ impl Queue {
         let chan = self
             .ch
             .entry(chan_name.to_owned())
-            .or_insert_with(|| flume::unbounded());
+            .or_insert_with(|| new_ch());
 
-        let rcv = chan.1.clone();
-        Ok(rcv)
+        Ok(chan.1.new_receiver())
     }
 
     pub async fn update_task_status(
@@ -89,9 +95,9 @@ impl Queue {
         let chan = self
             .ch
             .entry(chan_name.to_owned())
-            .or_insert_with(|| flume::unbounded());
+            .or_insert_with(|| new_ch());
 
-        match chan.0.send_async(t.to_owned()).await {
+        match chan.0.broadcast(t.to_owned()).await {
             Ok(_) => {}
             Err(err) => return Err(format!("Failed to send task to channel|Err: {}", err).into()),
         };
@@ -125,11 +131,11 @@ mod tests {
             let j = tokio::task::spawn(async move {
                 println!("spawned green thread"); //debug
                                                   //let mut qq = q1.lock().await;
-                let rcv = q1.lock().await.get_chan("test_chan").unwrap();
+                let mut rcv = q1.lock().await.get_chan("test_chan").unwrap();
                 println!("receiving"); //debug
                                        // infinite loop
                                        // async iterator
-                while let Ok(t) = rcv.recv_async().await {
+                while let Ok(t) = rcv.recv().await {
                     println!("received task with id: {}", t.id);
                     break; // break loop after receiving 1 task
                 }
@@ -164,11 +170,11 @@ mod tests {
             let j = tokio::task::spawn(async move {
                 println!("spawned green thread"); //debug
                                                   //let mut qq = q1.lock().await;
-                let rcv = q1.lock().await.get_chan("test_chan").unwrap();
+                let mut rcv = q1.lock().await.get_chan("test_chan").unwrap();
                 println!("receiving"); //debug
                                        // infinite loop
                                        // async iterator
-                while let Ok(t) = rcv.recv_async().await {
+                while let Ok(t) = rcv.recv().await {
                     if t.status == TaskStatus::Completed {
                         println!("received Completed task with id: {}", t.id);
                         break; // break loop after receiving 1 task
