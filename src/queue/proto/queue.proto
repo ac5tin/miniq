@@ -18,7 +18,10 @@ message Task {
   TaskStatus status = 4;
 }
 
-message GetTaskRequest { string name = 1; }
+message GetTaskRequest {
+  string channel = 1;
+  TaskStatus status = 2;
+}
 
 message AddTaskRequest {
   string channel = 1;
