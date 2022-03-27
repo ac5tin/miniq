@@ -81,6 +81,20 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
         let (tx, rx) = mpsc::channel(128);
 
         // stream existing tasks
+        {
+            let tasks = Q.lock().await.get_tasks(&req.channel, req.status.into());
+            for task in tasks {
+                match tx.send(Ok(task.into())).await {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Err(tonic::Status::new(
+                            tonic::Code::Internal,
+                            "Failed to send task to channel",
+                        ))
+                    }
+                };
+            }
+        }
 
         // stream new tasks
         tokio::task::spawn(async move {
