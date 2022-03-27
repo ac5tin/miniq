@@ -23,6 +23,7 @@ impl Into<mini_q::Task> for queue::task::Task {
                 nanos: self.creation_date.timestamp_subsec_nanos() as i32,
             }),
             status: self.status.to_owned().into(),
+            channel: self.channel.to_owned(),
         };
         t
     }
@@ -43,6 +44,7 @@ impl From<mini_q::Task> for queue::task::Task {
             data: t.data.to_owned(),
             creation_date: DateTime::from_utc(timestamp, Utc),
             status: t.status.into(),
+            channel: t.channel.to_owned(),
         }
     }
 }
@@ -77,6 +79,10 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
         // println!("Listening: {}, status: {}", req.channel, req.status); //debug
         // infinite stream of tasks
         let (tx, rx) = mpsc::channel(128);
+
+        // stream existing tasks
+
+        // stream new tasks
         tokio::task::spawn(async move {
             let req = req.clone();
             let mut rcv = match Q.lock().await.get_chan(&req.channel) {

@@ -35,7 +35,7 @@ impl Queue {
         chan_name: &str,
         data: Vec<u8>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let task = task::Task::new(data);
+        let task = task::Task::new(data, chan_name.to_string());
         // add task to queue
         let x = match self.tasks.get_mut() {
             Ok(tasks) => {
@@ -102,6 +102,16 @@ impl Queue {
             Err(err) => return Err(format!("Failed to send task to channel|Err: {}", err).into()),
         };
         Ok(())
+    }
+
+    pub fn get_tasks(&self, chan_name: &str, status: TaskStatus) -> Vec<Task> {
+        let mut res = Vec::new();
+        for task in self.tasks.read().unwrap().iter() {
+            if task.status == status && task.channel == chan_name {
+                res.push(task.clone());
+            }
+        }
+        res
     }
 }
 
@@ -205,5 +215,18 @@ mod tests {
             }
             j.await.unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn get_tasks() {
+        let mut q = Queue::new();
+        assert_eq!(
+            q.add_task("test", "test".as_bytes().to_vec())
+                .await
+                .is_err(),
+            false
+        );
+        let tasks = q.get_tasks("test", TaskStatus::Pending);
+        assert_eq!(tasks.len(), 1);
     }
 }

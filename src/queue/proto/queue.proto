@@ -16,6 +16,7 @@ message Task {
   bytes data = 2;
   google.protobuf.Timestamp creation_date = 3;
   TaskStatus status = 4;
+  string channel = 5;
 }
 
 message GetTaskRequest {

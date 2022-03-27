@@ -39,15 +39,17 @@ pub struct Task {
     pub data: Vec<u8>,
     pub creation_date: DateTime<Utc>,
     pub status: TaskStatus,
+    pub channel: String,
 }
 
 impl Task {
-    pub fn new(data: Vec<u8>) -> Self {
+    pub fn new(data: Vec<u8>, channel: String) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             data: data,
             creation_date: Utc::now(),
             status: TaskStatus::Pending,
+            channel: channel,
         }
     }
 }
