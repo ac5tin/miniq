@@ -82,7 +82,7 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
         // stream new tasks
         tokio::task::spawn(async move {
             let req = req.clone();
-            let rcv = match Q.lock().await.get_chan(&req.channel) {
+            let (snd, rcv) = match Q.lock().await.get_chan(&req.channel) {
                 Ok(ch) => ch,
                 Err(_) => {
                     return Err(tonic::Status::new(
@@ -97,11 +97,12 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
                 if task.status != req.status.into() {
                     continue;
                 }
-                let t: mini_q::Task = task.into();
+                let t: mini_q::Task = task.clone().into();
                 match tx.send(Result::<_, tonic::Status>::Ok(t)).await {
                     Ok(_) => {}
                     Err(_) => {
-                        println!("Failed to send task to channel");
+                        println!("Failed to send task to client, trying different client");
+                        snd.send_async(task.to_owned()).await;
                         break;
                     }
                 };

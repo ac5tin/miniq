@@ -56,14 +56,15 @@ impl Queue {
     pub fn get_chan(
         &mut self,
         chan_name: &str,
-    ) -> Result<Receiver<Task>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<(Sender<Task>, Receiver<Task>), Box<dyn std::error::Error + Send + Sync>> {
         let chan = self
             .ch
             .entry(chan_name.to_owned())
             .or_insert_with(|| flume::unbounded());
 
+        let snd = chan.0.clone();
         let rcv = chan.1.clone();
-        Ok(rcv)
+        Ok((snd, rcv))
     }
 
     pub async fn update_task_status(
@@ -144,7 +145,7 @@ mod tests {
             let j = tokio::task::spawn(async move {
                 println!("spawned green thread"); //debug
                                                   //let mut qq = q1.lock().await;
-                let rcv = q1.lock().await.get_chan("test_chan").unwrap();
+                let (_, rcv) = q1.lock().await.get_chan("test_chan").unwrap();
                 println!("receiving"); //debug
                                        // infinite loop
                                        // async iterator
@@ -183,7 +184,7 @@ mod tests {
             let j = tokio::task::spawn(async move {
                 println!("spawned green thread"); //debug
                                                   //let mut qq = q1.lock().await;
-                let rcv = q1.lock().await.get_chan("test_chan").unwrap();
+                let (_, rcv) = q1.lock().await.get_chan("test_chan").unwrap();
                 println!("receiving"); //debug
                                        // infinite loop
                                        // async iterator
