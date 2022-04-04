@@ -80,7 +80,7 @@ impl Queue {
         let task = tasks.iter_mut().find(|t| t.id == task_id);
         let t = match task {
             Some(t) => {
-                t.status = status;
+                t.status = status.clone(); // clone is needed
                 t
             }
             None => return Err("Failed to update task status".into()),
@@ -95,6 +95,15 @@ impl Queue {
             Ok(_) => {}
             Err(err) => return Err(format!("Failed to send task to channel|Err: {}", err).into()),
         };
+
+        // delete task if status is delete
+        {
+            if status.to_owned() == TaskStatus::Delete {
+                // delete task
+                tasks.retain(|x| x.status != TaskStatus::Delete);
+            }
+        }
+
         Ok(())
     }
 
@@ -222,5 +231,39 @@ mod tests {
         );
         let tasks = q.get_tasks("test", TaskStatus::Pending);
         assert_eq!(tasks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn delete_tasks() {
+        let mut q = Queue::new();
+        // add tasks
+        let new_task_id = q
+            .add_task("test", "test".as_bytes().to_vec())
+            .await
+            .unwrap();
+        // check tasks
+        {
+            let tasks = q.get_tasks("test", TaskStatus::Pending);
+            assert_eq!(tasks.len(), 1);
+            {
+                // check by directly accessing tasks
+                let tasks = q.tasks.read().unwrap();
+                assert_eq!(tasks.len(), 1);
+            }
+        }
+        // delete tasks
+        {
+            assert_eq!(
+                q.update_task_status("test", &new_task_id, TaskStatus::Delete)
+                    .await
+                    .is_err(),
+                false
+            );
+        }
+        // check tasks again
+        {
+            let tasks = q.tasks.read().unwrap();
+            assert_eq!(tasks.len(), 0);
+        }
     }
 }

@@ -7,6 +7,7 @@ pub enum TaskStatus {
     Running,
     Completed,
     Failed,
+    Delete,
 }
 
 impl Into<i32> for TaskStatus {
@@ -16,6 +17,7 @@ impl Into<i32> for TaskStatus {
             TaskStatus::Running => 1,
             TaskStatus::Completed => 2,
             TaskStatus::Failed => 3,
+            TaskStatus::Delete => 4,
         }
     }
 }
@@ -27,6 +29,7 @@ impl From<i32> for TaskStatus {
             1 => TaskStatus::Running,
             2 => TaskStatus::Completed,
             3 => TaskStatus::Failed,
+            4 => TaskStatus::Delete,
             _ => TaskStatus::Pending,
         }
     }
