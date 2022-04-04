@@ -6,6 +6,6 @@ RUN cargo build --release
 
 
 # Final image
-FROM alpine:3.15
-COPY --from=builder /app/target/release/miniq /usr/local/bin/miniq
+FROM debian:bookworm
+COPY --from=builder /app/target/release/miniq /bin/
 CMD miniq
