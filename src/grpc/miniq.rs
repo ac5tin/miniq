@@ -102,7 +102,12 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
                     Ok(_) => {}
                     Err(_) => {
                         println!("Failed to send task to client, trying different client");
-                        snd.send_async(task.to_owned()).await;
+                        match snd.send_async(task.to_owned()).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                println!("Failed to send task to client, Err: {}", err);
+                            }
+                        };
                         break;
                     }
                 };
