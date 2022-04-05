@@ -11,7 +11,7 @@ pub mod task;
 
 pub struct Queue {
     tasks: sync::RwLock<Vec<task::Task>>,
-    ch: HashMap<String, (Sender<Task>, Receiver<Task>)>, // channel_id -> sender
+    ch: HashMap<String, HashMap<TaskStatus, (Sender<Task>, Receiver<Task>)>>, // channel_id -> sender
 }
 
 impl Queue {
@@ -42,6 +42,8 @@ impl Queue {
         let chan = self
             .ch
             .entry(chan_name.to_owned())
+            .or_insert_with(|| HashMap::new())
+            .entry(TaskStatus::Pending)
             .or_insert_with(|| flume::unbounded());
 
         match chan.0.send_async(task.to_owned()).await {
@@ -56,10 +58,13 @@ impl Queue {
     pub fn get_chan(
         &mut self,
         chan_name: &str,
+        status: TaskStatus,
     ) -> Result<(Sender<Task>, Receiver<Task>), Box<dyn std::error::Error + Send + Sync>> {
         let chan = self
             .ch
             .entry(chan_name.to_owned())
+            .or_insert_with(|| HashMap::new())
+            .entry(status.to_owned())
             .or_insert_with(|| flume::unbounded());
 
         let snd = chan.0.clone();
@@ -90,6 +95,8 @@ impl Queue {
         let chan = self
             .ch
             .entry(chan_name.to_owned())
+            .or_insert_with(|| HashMap::new())
+            .entry(status.to_owned())
             .or_insert_with(|| flume::unbounded());
 
         match chan.0.send_async(t.to_owned()).await {
@@ -145,7 +152,11 @@ mod tests {
             let j = tokio::task::spawn(async move {
                 println!("spawned green thread"); //debug
                                                   //let mut qq = q1.lock().await;
-                let (_, rcv) = q1.lock().await.get_chan("test_chan").unwrap();
+                let (_, rcv) = q1
+                    .lock()
+                    .await
+                    .get_chan("test_chan", TaskStatus::Pending)
+                    .unwrap();
                 println!("receiving"); //debug
                                        // infinite loop
                                        // async iterator
@@ -184,7 +195,11 @@ mod tests {
             let j = tokio::task::spawn(async move {
                 println!("spawned green thread"); //debug
                                                   //let mut qq = q1.lock().await;
-                let (_, rcv) = q1.lock().await.get_chan("test_chan").unwrap();
+                let (_, rcv) = q1
+                    .lock()
+                    .await
+                    .get_chan("test_chan", TaskStatus::Completed)
+                    .unwrap();
                 println!("receiving"); //debug
                                        // infinite loop
                                        // async iterator

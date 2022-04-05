@@ -82,7 +82,7 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
         // stream new tasks
         tokio::task::spawn(async move {
             let req = req.clone();
-            let (snd, rcv) = match Q.lock().await.get_chan(&req.channel) {
+            let (snd, rcv) = match Q.lock().await.get_chan(&req.channel, req.status.into()) {
                 Ok(ch) => ch,
                 Err(_) => {
                     return Err(tonic::Status::new(
@@ -93,10 +93,16 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
             };
             // drop(q);
 
+            println!(
+                "Listening to channel: {} with status {}",
+                req.channel, req.status
+            ); // debug
             while let Ok(task) = rcv.recv_async().await {
+                // println!("want {:#?} and got {:#?}", req.status, task.status); //debug
                 if task.status != req.status.into() {
                     continue;
                 }
+                // println!("should stream task: {:?} [{:#?}]", task.id, task.status); // debug
                 let t: mini_q::Task = task.clone().into();
                 match tx.send(Result::<_, tonic::Status>::Ok(t)).await {
                     Ok(_) => {}

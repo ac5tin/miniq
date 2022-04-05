@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 
 // Task Status
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TaskStatus {
     Pending,
     Running,
