@@ -1,0 +1,14 @@
+# Builder
+FROM rustlang/rust:nightly-alpine as builder
+COPY . /app
+WORKDIR /app
+# install build dependencies
+RUN apk update && apk add --no-cache make protobuf-dev musl-dev
+# build
+RUN cargo build --release
+
+
+# Final image
+FROM alpine:3.15
+COPY --from=builder /app/target/release/miniq ./miniq
+CMD ./miniq
