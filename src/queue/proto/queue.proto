@@ -22,6 +22,11 @@ message Task {
 
 message GetTaskRequest {
   string channel = 1;
+  string task_id = 2;
+}
+
+message GetTasksRequest {
+  string channel = 1;
   TaskStatus status = 2;
 }
 
@@ -36,8 +41,12 @@ message UpdateTaskRequest {
   TaskStatus status = 3;
 }
 
+message GetAllTasksResponse { repeated Task tasks = 1; }
+
 service MiniQ {
-  rpc GetTasks(GetTaskRequest) returns (stream Task) {}
+  rpc GetTask(GetTaskRequest) returns (Task) {}
+  rpc GetTasks(GetTasksRequest) returns (stream Task) {}
+  rpc GetAllTasks(GetTasksRequest) returns (GetAllTasksResponse) {}
   rpc AddTask(AddTaskRequest) returns (Task) {}
   rpc UpdateTask(UpdateTaskRequest) returns (google.protobuf.Empty) {}
 }
