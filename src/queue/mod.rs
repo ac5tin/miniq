@@ -27,14 +27,12 @@ impl Queue {
         &mut self,
         chan_name: &str,
         data: Vec<u8>,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Task, Box<dyn std::error::Error + Send + Sync>> {
         let task = task::Task::new(data, chan_name.to_string());
         // add task to queue
-        let x = match self.tasks.get_mut() {
+        match self.tasks.get_mut() {
             Ok(tasks) => {
-                let task_id = task.id.clone();
                 tasks.push(task.clone());
-                task_id
             }
             Err(_) => return Err("Failed to add task".into()),
         };
@@ -46,13 +44,13 @@ impl Queue {
             .entry(TaskStatus::Pending)
             .or_insert_with(|| flume::unbounded());
 
-        match chan.0.send_async(task.to_owned()).await {
+        match chan.0.send_async(task.clone()).await {
             Ok(_) => {}
             Err(err) => return Err(format!("Failed to send task to channel|Err: {}", err).into()),
         };
 
         // success
-        Ok(x)
+        Ok(task.to_owned())
     }
 
     pub fn get_chan(
@@ -224,9 +222,9 @@ mod tests {
                 println!("Sending new task");
                 let task_add_res = qq.add_task("test_chan", data).await;
                 assert_eq!(task_add_res.is_err(), false);
-                let task_id = task_add_res.unwrap();
+                let task = task_add_res.unwrap();
                 assert_eq!(
-                    qq.update_task_status("test_chan", &task_id, TaskStatus::Completed)
+                    qq.update_task_status("test_chan", &task.id, TaskStatus::Completed)
                         .await
                         .is_err(),
                     false
@@ -253,7 +251,7 @@ mod tests {
     async fn delete_tasks() {
         let mut q = Queue::new();
         // add tasks
-        let new_task_id = q
+        let new_task = q
             .add_task("test", "test".as_bytes().to_vec())
             .await
             .unwrap();
@@ -270,7 +268,7 @@ mod tests {
         // delete tasks
         {
             assert_eq!(
-                q.update_task_status("test", &new_task_id, TaskStatus::Delete)
+                q.update_task_status("test", &new_task.id, TaskStatus::Delete)
                     .await
                     .is_err(),
                 false

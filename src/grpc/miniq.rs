@@ -7,6 +7,8 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::queue::{self, Q};
 
+use self::mini_q::Task;
+
 pub mod mini_q {
     tonic::include_proto!("miniq");
 }
@@ -59,11 +61,11 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
     async fn add_task(
         &self,
         req: tonic::Request<mini_q::AddTaskRequest>,
-    ) -> Result<tonic::Response<()>, tonic::Status> {
+    ) -> Result<tonic::Response<Task>, tonic::Status> {
         let mut q = Q.lock().await;
         let r = req.into_inner();
         match q.add_task(&r.channel, r.data.to_owned()).await {
-            Ok(_) => Ok(tonic::Response::new(())),
+            Ok(task) => Ok(tonic::Response::new(task.into())),
             Err(err) => Err(tonic::Status::new(
                 tonic::Code::Internal,
                 format!("Failed to add task|Err: {}", err),

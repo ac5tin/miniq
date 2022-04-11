@@ -38,6 +38,6 @@ message UpdateTaskRequest {
 
 service MiniQ {
   rpc GetTasks(GetTaskRequest) returns (stream Task) {}
-  rpc AddTask(AddTaskRequest) returns (google.protobuf.Empty) {}
+  rpc AddTask(AddTaskRequest) returns (Task) {}
   rpc UpdateTask(UpdateTaskRequest) returns (google.protobuf.Empty) {}
 }
