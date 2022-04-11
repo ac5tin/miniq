@@ -75,7 +75,7 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
 
     async fn get_tasks(
         &self,
-        request: tonic::Request<mini_q::GetTaskRequest>,
+        request: tonic::Request<mini_q::GetTasksRequest>,
     ) -> Result<tonic::Response<Self::GetTasksStream>, tonic::Status> {
         let req = request.into_inner();
         // infinite stream of tasks
@@ -145,5 +145,16 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
                 format!("Failed to update task|Err: {}", err),
             )),
         }
+    }
+
+    async fn get_all_tasks(
+        &self,
+        request: tonic::Request<mini_q::GetTasksRequest>,
+    ) -> Result<tonic::Response<mini_q::GetAllTasksResponse>, tonic::Status> {
+        let req = request.into_inner();
+        let _tasks = Q.lock().await.get_tasks(&req.channel, req.status.into());
+
+        let tasks: Vec<mini_q::Task> = _tasks.into_iter().map(|t| t.into()).collect();
+        Ok(tonic::Response::new(mini_q::GetAllTasksResponse { tasks }))
     }
 }
