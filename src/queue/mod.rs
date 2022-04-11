@@ -122,6 +122,11 @@ impl Queue {
         }
         res
     }
+
+    pub fn get_task(&self, task_id: &str) -> Option<Task> {
+        let tasks = self.tasks.read().unwrap();
+        tasks.iter().find(|t| t.id == task_id).cloned()
+    }
 }
 
 // singleton Queue

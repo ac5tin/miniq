@@ -73,6 +73,20 @@ impl mini_q::mini_q_server::MiniQ for MiniQServer {
         }
     }
 
+    async fn get_task(
+        &self,
+        req: tonic::Request<mini_q::GetTaskRequest>,
+    ) -> Result<tonic::Response<Task>, tonic::Status> {
+        let r = req.into_inner();
+        match Q.lock().await.get_task(&r.task_id) {
+            Some(task) => Ok(tonic::Response::new(task.into())),
+            None => Err(tonic::Status::new(
+                tonic::Code::Internal,
+                format!("Failed to find task"),
+            )),
+        }
+    }
+
     async fn get_tasks(
         &self,
         request: tonic::Request<mini_q::GetTasksRequest>,
